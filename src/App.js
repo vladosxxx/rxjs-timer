@@ -1,7 +1,14 @@
 import './App.css';
 import { useState, useEffect } from 'react'
-import { interval, fromEvent } from 'rxjs'
-import { map, debounceTime, buffer, filter } from 'rxjs/operators'
+import {fromEvent, timer} from "rxjs";
+import {buffer, throttleTime, filter, map,take} from "rxjs/operators";
+
+const stream$ = timer(0,1000)
+stream$.pipe(
+    map(i => i),
+    take(9),
+    filter(v => v < 10 ),
+)
 
 function App() {
     const [allSeconds, setAllSeconds] = useState(0)
@@ -11,61 +18,40 @@ function App() {
     const [isWait, setWait] = useState(false)
     const [isStart, setStart] = useState(false)
 
+
     const startStop = () => {
         if(isWait === true){
+            stream$.unsubscribe()
             setStart(!isStart)
             setWait(false)
         }
         else
         {
+            stream$.subscribe(res => setSeconds(res))
             setStart(!isStart)
             setAllSeconds(0)
+        }
+        if(isStart === true){
+            stream$.clean()
         }
     }
     const reset = () => {
         setAllSeconds(0)
         setStart(false)
         setWait(false)
-        setTimeout(() => setStart(true), 500)
-    }
-    const wait = () => {
-        setStart(false)
     }
 
-    useEffect(() => {
-        if(isStart === true)
-        {
-            const stream$ = interval(1000).pipe(map(i => allSeconds + i))
-            const subscription = stream$
-                .subscribe(i =>
-                    setAllSeconds(i)
-                );
-            return () => subscription.unsubscribe();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isStart] )
 
     useEffect(() => {
-        const mouse$ = fromEvent(document.querySelector('.wait'), 'click')
-        const buff$ = mouse$.pipe(
-            debounceTime(300),
-        )
-        const click$ = mouse$.pipe(
-            buffer(buff$),
-            map(list => {
-            return list.length;
-            }),
-            filter(x => x === 2),
-        )
-        click$.subscribe(() => {
-            wait()
-            setWait(true)
-        }
-        )
-        return () => {
-            buff$.unsubscribe()
-        }
-    }, [])
+        const clicks$ = fromEvent(document.querySelector('.wait'), 'click');
+        clicks$
+            .pipe(
+                buffer(clicks$.pipe(throttleTime(300))),
+                filter(clickArray => clickArray.length > 1)
+            )
+            .subscribe(() => alert('Double Click!'));
+    }, [] )
+
 
     useEffect(() => {
         setHours(('0' + Math.floor(allSeconds / 60 / 60)).slice(-2))
